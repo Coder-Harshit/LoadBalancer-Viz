@@ -64,8 +64,8 @@ class LoadBalancerVisualizer:
             self.canvas.itemconfigure(server_text,tags=(server.serverId,))
 
     def handleRequest(self,client,server):
-        # processingTime = random.randint(1,5)
-        processingTime = 10
+        processingTime = random.randint(1,7)
+        # processingTime = 7
         time.sleep(processingTime)
         
         output = f'Output for client {client.clientId} from server {server.serverId}'
