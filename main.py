@@ -1,113 +1,118 @@
+# importing libraries
 import tkinter as tk
 import random
 import time
 import threading
-from queue import Queue
 
 class Server:
-    def __init__(self, server_id, capacity):
-        self.server_id = server_id
+    def __init__(self,serverId,capacity) -> None:
+        self.serverId = serverId
         self.capacity = capacity
-        self.current_load = 0
-        self.lock = threading.Lock()  # Add a lock to ensure thread safety
-
+        self.currLoad = 0
+        # Generate a random color for the server
+        self.color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
 class Client:
-    def __init__(self, client_id):
-        self.client_id = client_id
-
+    def __init__(self,clientId) -> None:
+        self.clientId = clientId
+class LoadBalancer:
+    pass
 class LoadBalancerVisualizer:
-    def __init__(self, master, num_servers, servers):
+    def __init__(self,master,serverQuantity,servers,geometry) -> None:
         self.master = master
         self.servers = servers
         self.clients = []
-        self.queue = Queue()  # Queue for holding clients when all servers are at full capacity
-        self.canvas = tk.Canvas(master, width=800, height=500)
-        self.canvas.pack()
-        self.client_status = {}  # Track client status (active or queued)
-        self.draw_servers()
+        # print(geometry)
+        self.frame = self.master
+        # self.frame = tk.Frame(self.master)
+        # self.frame.grid(row=0,column=0)
+        # self.frame.config(width=geometry[0],height=geometry[1])
+        # self.canvas = tk.Canvas(master,width=geometry[0],height=geometry[1])
+        self.canvas = tk.Canvas(self.frame)
+        self.scrollbar = tk.Scrollbar(self.frame,orient='horizontal',command=self.canvas.xview)
+        self.genReqButton = tk.Button(self.frame,text="GENERATE REQ.", command=self.genReq)
+        self.genReqButton.grid(row=2,column=0)
+        self.canvas.config(xscrollcommand=self.scrollbar.set)
+        # self.canvas.grid(row=0,column=0,columnspan=serverQuantity,padx=10,pady=10)
+        self.canvas.grid(row=0,column=0,padx=10,pady=10,sticky='nsew')
+        self.scrollbar.grid(row=1,column=0,sticky='ew')
 
-    def draw_servers(self):
-        for server in self.servers:
-            x = 100 + int(server.server_id[1:]) * 200
+        # Bind canvas to frame
+        self.frame.grid_rowconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(0, weight=1)
+        self.canvas.bind("<Configure>", self.onCanvasConfigure)
+
+        self.drawServers()
+        # master.bind("<Configure>", self.onWindowResize)
+
+    # def onWindowResize(self, event):
+        # Adjust canvas size only if the user resizes the Tkinter window
+        # if event.widget == self.master:
+            # self.canvas.config(width=event.width)
+
+        
+    def onCanvasConfigure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def drawServers(self):
+        for i,server in enumerate(self.servers):
+            x = 100 + i*200
             y = 100
-            self.canvas.create_rectangle(x-20, y-20, x+20, y+20, fill='blue')
-            self.canvas.create_text(x, y-30, text=f'Server {server.server_id}')
+            serverText = f'{server.serverId}\nLoad: {server.currLoad}/{server.capacity}'
+            server_rect = self.canvas.create_rectangle(x-40,y-40,x+40,y+40,fill='blue')
+            server_text = self.canvas.create_text(x,y,text=serverText,justify=tk.CENTER,fill='white',tags=server.serverId)
+            self.canvas.itemconfigure(server_text,tags=(server.serverId,))
 
-    def draw_clients(self):
-        for i, client in enumerate(self.clients):
-            x = 50 + i * 100
-            y = 400
-            
-            if client in self.client_status:
-                status = self.client_status[client]
-                fill_color = 'green' if status == 'active' else 'red'
-                
-                # Draw clients on the canvas with respective colors
-                self.canvas.create_rectangle(x-20, y-20, x+20, y+20, fill=fill_color)
-                self.canvas.create_text(x, y+30, text=f'Client {client.client_id}')
+    def genReq(self):
+        clientId = len(self.clients)+1
+        newClient = Client(clientId=clientId)
+        self.clients.append(newClient)
 
-    def generate_request(self):
-        client_id = len(self.clients) + 1
-        new_client = Client(client_id)
-        
-        # Check if all servers are at full capacity
-        if all(server.current_load >= server.capacity for server in self.servers):
-            print(f"All servers are at full capacity. Client {client_id} is queued.")
-            self.client_status[new_client] = 'queued'
-            self.queue.put(new_client)
-            self.update_visualization()
+         # Choose a server with available capacity
+        available_servers = [server for server in self.servers if server.currLoad < server.capacity]
+        if not available_servers:
+            print("All servers are fully loaded")
             return
-        
-        self.client_status[new_client] = 'active'
-        threading.Thread(target=self.process_request, args=(new_client,)).start()
+        server = random.choice(available_servers)
 
-    def process_request(self, client):
-        next_server = self.get_next_server()
-        # processing_time = random.randint(1, 5)  # Simulate processing time
-        processing_time = 5  # Simulate processing time
-        time.sleep(processing_time)  # Simulate request processing time
-        
-        with next_server.lock:
-            next_server.current_load += 1  # Update server load after processing
-        
-        print(f"Client {client.client_id} sent request to Server {next_server.server_id}.")
-        print(f"Request from client {client.client_id} processed by Server {next_server.server_id}.")
-        print(f"Server {next_server.server_id} load: {next_server.current_load}/{next_server.capacity}")
+        # Update server load
+        server.currLoad += 1
+
+        # Draw line from client to server
+        client_x = random.randint(50, self.canvas.winfo_width()-50)
+        client_y = random.randint(200, self.canvas.winfo_height()-50)
+        server_x = 100 + self.servers.index(server) * 200
+        server_y = 100
+        # color = "#{:06x}".format(random.randint(0, 0xFFFFFF))  # Random color for the line
+        self.canvas.create_line(client_x, client_y, server_x, server_y, fill=server.color,width=3)
+
+        # Draw client circle with its ID
+        self.canvas.create_oval(client_x-20, client_y-20, client_x+20, client_y+20, fill='green')
+        self.canvas.create_text(client_x, client_y, text=str(clientId), fill='white')
+
+        # Update server load text
+        serverText = f'{server.serverId}\nLoad: {server.currLoad}/{server.capacity}'
+        print(serverText)
         print()
-        
-        with next_server.lock:
-            next_server.current_load -= 1  # Update server load after processing
-        
-        # Remove client from the dictionary
-        del self.client_status[client]
-        self.update_visualization()
+        self.canvas.itemconfigure(server.serverId, text=serverText)
+        # print(self.canvas.itemconfigure(server.serverId, text="text"))
 
-    def get_next_server(self):
-        for server in self.servers:
-            if server.current_load < server.capacity:
-                return server
 
-    def update_visualization(self):
-        self.canvas.delete(tk.ALL)
-        self.draw_servers()
-        self.draw_clients()
 
 def main():
     root = tk.Tk()
     root.title("Load Balancer Visualizer")
-
-    servers = [
-        Server("S1", 3),
-        Server("S2", 2),
-        Server("S3", 1)
+    width = 600
+    height = 500
+    serverFarm = [
+        Server("S1",1),
+        Server("S2",2),
+        Server("S3",3),
+        # Server("S4",2),
+        # Server("S5",2),
     ]
-
-    lbv = LoadBalancerVisualizer(root, num_servers=len(servers), servers=servers)
-
-    generate_button = tk.Button(root, text="Generate Request", command=lbv.generate_request)
-    generate_button.pack()
-
+    root.geometry(f'{width}x{height}')
+    lbv = LoadBalancerVisualizer(root,serverQuantity=len(serverFarm),servers=serverFarm,geometry=(width,height))
     root.mainloop()
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
