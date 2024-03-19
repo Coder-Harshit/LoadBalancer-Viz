@@ -21,6 +21,7 @@ class LoadBalancerVisualizer:
         self.master = master
         self.servers = servers
         self.clients = []
+        self.clientsItems = {}
         # print(geometry)
         self.frame = self.master
         # self.frame = tk.Frame(self.master)
@@ -62,6 +63,24 @@ class LoadBalancerVisualizer:
             server_text = self.canvas.create_text(x,y,text=serverText,justify=tk.CENTER,fill='white',tags=server.serverId)
             self.canvas.itemconfigure(server_text,tags=(server.serverId,))
 
+    def handleRequest(self,client,server):
+        # processingTime = random.randint(1,5)
+        processingTime = 10
+        time.sleep(processingTime)
+        
+        output = f'Output for client {client.clientId} from server {server.serverId}'
+        print(output)
+
+        server.currLoad -= 1
+        self.canvas.itemconfigure(server.serverId,text=f'{server.serverId}\nLoad: {server.currLoad}/{server.capacity}')
+        # self.canvas.delete(self.clientsItems[client])
+        # del self.clientsItems[client]
+        clientItems = self.clientsItems.pop(client, None)
+        if clientItems:
+            for item in clientItems:
+                self.canvas.delete(item)
+
+
     def genReq(self):
         clientId = len(self.clients)+1
         newClient = Client(clientId=clientId)
@@ -83,11 +102,13 @@ class LoadBalancerVisualizer:
         server_x = 100 + self.servers.index(server) * 200
         server_y = 100
         # color = "#{:06x}".format(random.randint(0, 0xFFFFFF))  # Random color for the line
-        self.canvas.create_line(client_x, client_y, server_x, server_y, fill=server.color,width=3)
+        line = self.canvas.create_line(client_x, client_y, server_x, server_y, fill=server.color,width=3)
 
         # Draw client circle with its ID
-        self.canvas.create_oval(client_x-20, client_y-20, client_x+20, client_y+20, fill='green')
-        self.canvas.create_text(client_x, client_y, text=str(clientId), fill='white')
+        clientCircle = self.canvas.create_oval(client_x-20, client_y-20, client_x+20, client_y+20, fill='green')
+        clientText = self.canvas.create_text(client_x, client_y, text=str(clientId), fill='white')
+
+        self.clientsItems[newClient] = (clientCircle, clientText, line)
 
         # Update server load text
         serverText = f'{server.serverId}\nLoad: {server.currLoad}/{server.capacity}'
@@ -95,9 +116,10 @@ class LoadBalancerVisualizer:
         print()
         self.canvas.itemconfigure(server.serverId, text=serverText)
         # print(self.canvas.itemconfigure(server.serverId, text="text"))
+        thread = threading.Thread(target=self.handleRequest, args=(newClient,server))
+        thread.start()
 
-
-
+    
 def main():
     root = tk.Tk()
     root.title("Load Balancer Visualizer")
